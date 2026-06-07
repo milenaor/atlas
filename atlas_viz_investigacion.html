@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLAS — De la investigación a la Sociedad</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --ink:#F5EFE6;--cream:#F0E8DC;--lt:#D4C9BE;
+  --gray:#8A8078;--dark:#3D3530;
+  --pink:#C4547A;--orange:#E8821A;--green:#6BAB6E;
+  --blue:#4A7FB5;--red:#C94040;--teal:#5BA8A0;
+}
+html,body{min-height:100vh;background:#E8E0D5;font-family:'DM Mono','Courier New',monospace;color:var(--dark);}
+.page{max-width:880px;margin:0 auto;min-height:100vh;background:var(--ink);border-left:1px solid var(--lt);border-right:1px solid var(--lt);}
+
+.top-bar{background:var(--cream);border-bottom:1px solid var(--lt);padding:14px 28px;}
+.logo{font-family:'Playfair Display',serif;font-size:17px;color:var(--dark);letter-spacing:.12em;}
+.logo em{color:var(--pink);font-style:italic;}
+.logo-sub{font-size:10px;color:var(--gray);font-style:italic;font-family:'Playfair Display',serif;margin-top:1px;}
+
+.apikey-banner{background:#FBF0F4;border-bottom:1px solid #E8C0CC;padding:10px 28px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.apikey-banner label{font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--pink);white-space:nowrap;}
+.apikey-input{flex:1;min-width:200px;background:#fff;border:1px solid #E8C0CC;border-radius:6px;font-family:'DM Mono',monospace;font-size:10px;color:var(--dark);padding:7px 10px;}
+.apikey-input:focus{outline:none;border-color:var(--pink);}
+.apikey-input::placeholder{color:var(--gray);opacity:.5;}
+.apikey-note{font-size:8px;color:var(--gray);opacity:.6;white-space:nowrap;}
+
+.hero{padding:28px 28px 0;text-align:center;}
+.eyebrow{font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--pink);margin-bottom:10px;opacity:.85;}
+.hero-title{font-family:'Playfair Display',serif;font-size:24px;color:var(--dark);line-height:1.3;margin-bottom:6px;}
+.hero-title em{color:var(--pink);font-style:italic;}
+.hero-desc{font-size:10px;color:var(--gray);letter-spacing:.04em;line-height:1.75;max-width:420px;margin:0 auto 22px;}
+
+.drop-zone{margin:0 28px;border:1.5px dashed var(--lt);border-radius:14px;background:var(--cream);padding:28px 24px 22px;text-align:center;transition:all .3s;}
+.drop-zone.over{border-color:var(--pink);background:#FBF0F4;}
+.drop-zone.has-files{border-color:var(--green);border-style:solid;background:#F3FAF3;}
+.drop-zone.done{border-color:var(--green);border-style:solid;background:#F3FAF3;}
+.drop-icon-ring{width:56px;height:56px;border-radius:50%;border:1px solid var(--lt);background:var(--ink);display:flex;align-items:center;justify-content:center;margin:0 auto 11px;transition:all .3s;pointer-events:none;}
+.drop-zone.has-files .drop-icon-ring,.drop-zone.done .drop-icon-ring{border-color:var(--green);background:#F3FAF3;}
+.drop-icon-ring i{font-size:22px;color:var(--gray);transition:color .3s;}
+.drop-zone.has-files .drop-icon-ring i,.drop-zone.done .drop-icon-ring i{color:var(--green);}
+.drop-main{font-family:'Playfair Display',serif;font-size:15px;color:var(--dark);margin-bottom:4px;pointer-events:none;}
+.drop-hint{font-size:10px;color:var(--gray);opacity:.6;margin-bottom:14px;pointer-events:none;}
+.format-pills{display:flex;gap:5px;justify-content:center;flex-wrap:wrap;pointer-events:none;margin-bottom:14px;}
+.fpill{font-size:7.5px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--lt);border-radius:20px;padding:3px 10px;color:var(--gray);background:var(--ink);}
+.fpill.pdf{color:var(--red);border-color:#E8A8A8;}
+.fpill.word{color:var(--blue);border-color:#A8C0D8;}
+.fpill.excel{color:var(--green);border-color:#A8D4A8;}
+.fpill.csv{color:var(--orange);border-color:#E8C8A8;}
+.fpill.txt{color:var(--teal);border-color:#A8D4D0;}
+.browse-lbl{display:inline-flex;align-items:center;gap:6px;background:var(--ink);border:1px solid var(--lt);border-radius:8px;font-family:'DM Mono',monospace;font-size:10px;color:var(--gray);letter-spacing:.07em;padding:8px 16px;cursor:pointer;transition:all .25s;}
+.browse-lbl:hover{border-color:var(--pink);color:var(--pink);background:#FBF0F4;}
+
+.file-list{margin:10px 28px 0;display:flex;flex-direction:column;gap:5px;}
+.file-item{display:flex;align-items:center;gap:9px;background:var(--cream);border:1px solid var(--lt);border-radius:8px;padding:9px 13px;animation:slideIn .3s ease;}
+@keyframes slideIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
+.fi-name{font-size:10px;color:var(--dark);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fi-size{font-size:8px;color:var(--gray);opacity:.6;flex-shrink:0;}
+.fi-remove{background:none;border:none;cursor:pointer;color:var(--gray);opacity:.4;font-size:13px;padding:0;line-height:1;transition:all .2s;flex-shrink:0;}
+.fi-remove:hover{color:var(--red);opacity:1;}
+.fi-ext{font-size:7px;letter-spacing:.08em;text-transform:uppercase;border-radius:3px;padding:2px 6px;font-weight:500;flex-shrink:0;}
+
+.analyze-wrap{padding:12px 28px 0;}
+.analyze-btn{width:100%;padding:14px 24px;background:var(--pink);border:none;border-radius:10px;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:#fff;cursor:pointer;transition:all .3s;display:flex;align-items:center;justify-content:center;gap:9px;}
+.analyze-btn:hover:not(:disabled){background:#B0436A;transform:translateY(-1px);}
+.analyze-btn:disabled{background:var(--lt);color:var(--gray);cursor:not-allowed;transform:none;}
+.analyze-btn.done{background:var(--green);}
+.analyze-btn i{font-size:15px;}
+
+.progress-wrap{margin:10px 28px 0;display:none;}
+.progress-wrap.active{display:block;}
+.prog-bar-bg{height:3px;background:var(--lt);border-radius:2px;margin-bottom:8px;overflow:hidden;}
+.prog-bar-fill{height:100%;border-radius:2px;background:var(--pink);width:0%;transition:width .5s ease;}
+.prog-log{padding:10px 13px;background:var(--cream);border:1px solid var(--lt);border-radius:8px;max-height:100px;overflow:hidden;}
+.log-line{font-size:8.5px;color:var(--gray);margin-bottom:3px;opacity:0;animation:logfade .3s forwards;}
+@keyframes logfade{to{opacity:.7;}}
+.lp{color:var(--pink);}
+.error-box{background:#FBF0F0;border:1px solid #E8A8A8;border-radius:8px;padding:12px 16px;font-size:10px;color:var(--red);line-height:1.6;margin-top:8px;}
+
+.dims-section{padding:14px 28px 0;display:none;}
+.dims-section.active{display:block;}
+.sec-label{font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gray);opacity:.5;margin-bottom:9px;display:flex;align-items:center;gap:8px;}
+.sec-label::after{content:'';flex:1;height:1px;background:var(--lt);}
+.dims-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;}
+.dim-btn{border:1px solid var(--lt);border-radius:7px;padding:9px 5px;text-align:center;background:var(--cream);cursor:pointer;transition:all .2s;font-family:'DM Mono',monospace;}
+.dim-btn:hover{border-color:var(--pink);background:#FBF0F4;}
+.dim-btn.active{border-color:var(--pink);background:#FBF0F4;box-shadow:0 0 0 1px rgba(196,84,122,.15);}
+.dim-nm{font-size:7.5px;color:var(--gray);letter-spacing:.05em;text-transform:uppercase;line-height:1.4;display:block;transition:color .2s;}
+.dim-btn:hover .dim-nm,.dim-btn.active .dim-nm{color:var(--pink);}
+
+.result-panel{margin:10px 28px 0;display:none;animation:fadeUp .35s ease;}
+.result-panel.active{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+.rpanel{background:var(--cream);border:1px solid var(--lt);border-radius:10px;padding:18px 20px;}
+.rpanel-title{font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--pink);margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.rpanel-title::after{content:'';flex:1;height:1px;background:#DDD4C8;}
+
+/* Shared components */
+.rquote{font-family:'Playfair Display',serif;font-size:13px;color:var(--dark);line-height:1.9;font-style:italic;border-left:2px solid var(--pink);padding:12px 14px 12px 13px;}
+.rcards{display:flex;flex-direction:column;gap:7px;}
+.rcard{background:var(--ink);border:1px solid var(--lt);border-radius:8px;padding:11px 14px;border-left:3px solid;}
+.rcard-t{font-size:8.5px;letter-spacing:.07em;text-transform:uppercase;margin-bottom:5px;font-weight:500;}
+.rcard-b{font-family:'Playfair Display',serif;font-size:12.5px;color:var(--dark);line-height:1.75;}
+.rgrid2{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+
+/* TEMATICAS — horizontal bar chart */
+.tema-row{display:flex;flex-direction:column;gap:10px;}
+.tema-item{display:flex;align-items:center;gap:10px;}
+.tema-label{font-size:9px;color:var(--dark);letter-spacing:.03em;min-width:140px;flex-shrink:0;line-height:1.3;}
+.tema-bar-wrap{flex:1;display:flex;align-items:center;gap:8px;}
+.tema-bar-bg{flex:1;height:8px;background:var(--lt);border-radius:4px;overflow:hidden;}
+.tema-bar-fill{height:100%;border-radius:4px;transition:width 1s ease;}
+.tema-pct{font-size:9px;font-weight:500;min-width:32px;text-align:right;flex-shrink:0;}
+.tema-note{font-size:8px;color:var(--gray);opacity:.6;margin-top:4px;font-style:italic;}
+
+/* TERRITORIOS — cards con justificación */
+.terr-intro{font-family:'Playfair Display',serif;font-size:12.5px;color:var(--dark);line-height:1.8;font-style:italic;border-left:2px solid var(--teal);padding:10px 13px;margin-bottom:12px;}
+.terr-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.terr-card{background:var(--ink);border:1px solid var(--lt);border-radius:9px;padding:13px 15px;border-top:3px solid;}
+.terr-scope{font-size:7px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px;opacity:.7;}
+.terr-name{font-size:10px;font-weight:500;color:var(--dark);margin-bottom:5px;letter-spacing:.03em;}
+.terr-why{font-family:'Playfair Display',serif;font-size:11.5px;color:var(--dark);opacity:.75;line-height:1.65;font-style:italic;}
+
+/* PUBLICOS — donut + list */
+.pub-layout{display:grid;grid-template-columns:180px 1fr;gap:20px;align-items:start;}
+.pub-canvas-wrap{position:relative;width:170px;height:170px;flex-shrink:0;}
+.pub-canvas-wrap canvas{width:170px;height:170px;}
+.pub-center-label{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;}
+.pub-center-n{font-family:'Playfair Display',serif;font-size:22px;color:var(--dark);}
+.pub-center-s{font-size:7px;color:var(--gray);letter-spacing:.08em;text-transform:uppercase;display:block;}
+.pub-list{display:flex;flex-direction:column;gap:7px;}
+.pub-item{display:flex;align-items:center;gap:9px;}
+.pub-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.pub-info{flex:1;}
+.pub-name{font-size:9.5px;color:var(--dark);line-height:1.3;}
+.pub-bar-bg{height:4px;background:var(--lt);border-radius:2px;margin-top:3px;}
+.pub-bar-fill{height:100%;border-radius:2px;transition:width 1s ease;}
+.pub-pct-lbl{font-size:8.5px;font-weight:500;flex-shrink:0;min-width:28px;text-align:right;}
+
+/* SOLUCIONES — impact cards */
+.sol-intro{font-family:'Playfair Display',serif;font-size:12.5px;color:var(--dark);line-height:1.8;font-style:italic;border-left:2px solid var(--orange);padding:10px 13px;margin-bottom:12px;}
+.sol-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.sol-card{background:var(--ink);border:1px solid var(--lt);border-radius:9px;padding:14px 15px;position:relative;overflow:hidden;}
+.sol-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--sol-c);}
+.sol-icon{font-size:18px;margin-bottom:8px;display:block;}
+.sol-action{font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--sol-c);margin-bottom:5px;font-weight:500;}
+.sol-desc{font-family:'Playfair Display',serif;font-size:11.5px;color:var(--dark);line-height:1.65;font-style:italic;}
+.sol-impact{font-size:8px;color:var(--gray);margin-top:6px;letter-spacing:.05em;display:flex;align-items:center;gap:4px;}
+
+/* FORMATOS — radial score cards */
+.fmt-intro{font-family:'Playfair Display',serif;font-size:12.5px;color:var(--dark);line-height:1.8;font-style:italic;border-left:2px solid var(--blue);padding:10px 13px;margin-bottom:12px;}
+.fmt-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
+.fmt-card{background:var(--ink);border:1px solid var(--lt);border-radius:9px;padding:13px 15px;display:flex;gap:12px;align-items:flex-start;}
+.fmt-score-ring{position:relative;width:52px;height:52px;flex-shrink:0;}
+.fmt-score-ring svg{width:52px;height:52px;}
+.fmt-ring-bg{fill:none;stroke:var(--lt);stroke-width:4;}
+.fmt-ring-fill{fill:none;stroke-width:4;stroke-linecap:round;transition:stroke-dashoffset 1s ease;transform:rotate(-90deg);transform-origin:50% 50%;}
+.fmt-score-num{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:'Playfair Display',serif;font-size:13px;font-weight:700;line-height:1;}
+.fmt-info{flex:1;}
+.fmt-name{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--dark);margin-bottom:4px;font-weight:500;}
+.fmt-reason{font-size:8.5px;color:var(--gray);line-height:1.5;}
+.fmt-tag{display:inline-block;font-size:7px;letter-spacing:.08em;text-transform:uppercase;border-radius:20px;padding:2px 8px;border:1px solid;margin-top:5px;}
+
+.bottom-note{padding:14px 28px 20px;text-align:center;font-size:9px;color:var(--gray);opacity:.35;letter-spacing:.05em;border-top:1px solid var(--lt);margin-top:14px;}
+input[type=file]{display:none;}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="top-bar">
+  <div class="logo">ATL<em>A</em>S</div>
+  <div class="logo-sub">De la investigación a la Sociedad</div>
+</div>
+
+<div class="apikey-banner">
+  <label><i class="ti ti-key" style="font-size:11px;margin-right:3px;"></i>API Key Anthropic</label>
+  <input class="apikey-input" type="password" id="apiKey" placeholder="sk-ant-api03-..." autocomplete="off">
+  <span class="apikey-note">console.anthropic.com → API Keys</span>
+</div>
+
+<div class="hero">
+  <div class="eyebrow">— Plataforma de visualización de tu investigación —</div>
+  <div class="hero-title">Convierte tu investigación<br>en un <em>paisaje de conocimiento</em></div>
+  <div class="hero-desc">Carga uno o varios documentos. La IA los analizará y generará visualizaciones en 10 dimensiones de apropiación social del conocimiento.</div>
+</div>
+
+<div class="drop-zone" id="dropZone">
+  <div class="drop-icon-ring"><i class="ti ti-cloud-upload"></i></div>
+  <div class="drop-main" id="dropMain">Arrastra tus documentos aquí</div>
+  <div class="drop-hint" id="dropHint">Suelta los archivos en este espacio</div>
+  <div class="format-pills">
+    <span class="fpill pdf">PDF</span><span class="fpill word">Word</span>
+    <span class="fpill excel">Excel</span><span class="fpill csv">CSV</span><span class="fpill txt">TXT</span>
+  </div>
+  <label class="browse-lbl" for="fileInput">
+    <i class="ti ti-folder-open"></i> Buscar en tu computador
+  </label>
+  <div style="font-size:8px;color:var(--gray);opacity:.5;margin-top:10px;">PDFs extensos se dividen automáticamente para análisis completo</div>
+</div>
+<input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt">
+
+<div class="file-list" id="fileList"></div>
+
+<div class="analyze-wrap">
+  <button class="analyze-btn" id="analyzeBtn" disabled onclick="startAnalysis()">
+    <i class="ti ti-sparkles"></i> Analizar investigación
+  </button>
+</div>
+
+<div class="progress-wrap" id="progressWrap">
+  <div class="prog-bar-bg"><div class="prog-bar-fill" id="pbFill"></div></div>
+  <div class="prog-log" id="progLog"></div>
+</div>
+<div id="errorBox" style="margin:0 28px;"></div>
+
+<div class="dims-section" id="dimsSection">
+  <div class="sec-label">Dimensiones analizadas — haz clic para explorar</div>
+  <div class="dims-grid" id="dimsGrid"></div>
+</div>
+
+<div class="result-panel" id="resultPanel">
+  <div class="rpanel" id="rpanelInner"></div>
+</div>
+
+<div class="bottom-note">Tus documentos se procesan de forma segura · La API key nunca se almacena</div>
+</div>
+
+<script>
+const DIMS=[
+  {id:'sinopsis',label:'Sinopsis'},
+  {id:'tematicas',label:'Temáticas'},
+  {id:'apropiacion',label:'Apropiación social'},
+  {id:'cambios',label:'Cambios posibles'},
+  {id:'territorios',label:'Territorios'},
+  {id:'objetivos',label:'Objetivos'},
+  {id:'publicos',label:'Públicos'},
+  {id:'soluciones',label:'Soluciones'},
+  {id:'tipologias',label:'Tipologías'},
+  {id:'formatos',label:'Formatos'},
+];
+const PAL=['#C4547A','#E8821A','#6BAB6E','#4A7FB5','#5BA8A0','#C94040','#8A8078','#B4A7E5'];
+const pc=i=>PAL[i%PAL.length];
+
+/* FILES */
+let FILES=[];
+const EXTM={
+  pdf:{icon:'ti-file-type-pdf',color:'#C94040',bg:'#FBF0F0',label:'PDF'},
+  doc:{icon:'ti-file-type-doc',color:'#4A7FB5',bg:'#EEF4FA',label:'Word'},
+  docx:{icon:'ti-file-type-doc',color:'#4A7FB5',bg:'#EEF4FA',label:'Word'},
+  xls:{icon:'ti-file-type-xls',color:'#6BAB6E',bg:'#F3FAF3',label:'Excel'},
+  xlsx:{icon:'ti-file-type-xls',color:'#6BAB6E',bg:'#F3FAF3',label:'Excel'},
+  csv:{icon:'ti-table',color:'#E8821A',bg:'#FBF5EE',label:'CSV'},
+  txt:{icon:'ti-file-text',color:'#5BA8A0',bg:'#EEF8F7',label:'TXT'},
+};
+const gExt=n=>(n.split('.').pop()||'').toLowerCase();
+const fmtSz=b=>b<1024?b+'B':b<1048576?Math.round(b/1024)+'KB':(Math.round(b/1048576*10)/10)+'MB';
+const getMeta=n=>EXTM[gExt(n)]||{icon:'ti-file',color:'#8A8078',bg:'#F0E8DC',label:gExt(n).toUpperCase()};
+
+function renderFiles(){
+  const list=document.getElementById('fileList');
+  list.innerHTML='';
+  FILES.forEach((f,i)=>{
+    const m=getMeta(f.name);
+    const el=document.createElement('div');el.className='file-item';
+    el.innerHTML=`<i class="ti ${m.icon}" style="color:${m.color};font-size:18px;flex-shrink:0;"></i>
+      <span class="fi-name" title="${f.name}">${f.name}</span>
+      <span class="fi-ext" style="color:${m.color};background:${m.bg};border:1px solid ${m.color}50;">${m.label}</span>
+      <span class="fi-size">${fmtSz(f.size)}</span>
+      <button class="fi-remove" onclick="rmFile(${i})"><i class="ti ti-x"></i></button>`;
+    list.appendChild(el);
+  });
+  const btn=document.getElementById('analyzeBtn');
+  if(!btn.classList.contains('done'))btn.disabled=FILES.length===0;
+  const dz=document.getElementById('dropZone');
+  if(!dz.classList.contains('done')){
+    if(FILES.length>0){
+      dz.classList.add('has-files');
+      document.getElementById('dropMain').textContent=FILES.length===1?'1 documento cargado':FILES.length+' documentos cargados';
+      document.getElementById('dropHint').textContent='Puedes seguir agregando más archivos';
+    }else{
+      dz.classList.remove('has-files');
+      document.getElementById('dropMain').textContent='Arrastra tus documentos aquí';
+      document.getElementById('dropHint').textContent='Suelta los archivos en este espacio';
+    }
+  }
+}
+function addFiles(fs){
+  const ok=['pdf','doc','docx','xls','xlsx','csv','txt'];
+  Array.from(fs).forEach(f=>{
+    if(!ok.includes(gExt(f.name)))return;
+    if(!FILES.find(x=>x.name===f.name&&x.size===f.size))FILES.push(f);
+  });
+  renderFiles();
+}
+function rmFile(i){FILES.splice(i,1);renderFiles();}
+const dz=document.getElementById('dropZone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over');});
+dz.addEventListener('dragleave',e=>{if(!dz.contains(e.relatedTarget))dz.classList.remove('over');});
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');addFiles(e.dataTransfer.files);});
+document.getElementById('fileInput').addEventListener('change',e=>{addFiles(e.target.files);e.target.value='';});
+
+function addLog(msg){
+  const l=document.getElementById('progLog');
+  const d=document.createElement('div');d.className='log-line';
+  d.innerHTML=`<span class="lp">›</span> ${msg}`;
+  l.appendChild(d);l.scrollTop=l.scrollHeight;
+}
+function setProg(p){document.getElementById('pbFill').style.width=p+'%';}
+function showError(msg){document.getElementById('errorBox').innerHTML=`<div class="error-box"><i class="ti ti-alert-circle" style="margin-right:6px;"></i>${msg.replace(/\n/g,'<br>')}</div>`;}
+function clearError(){document.getElementById('errorBox').innerHTML='';}
+
+function uint8ToBase64(bytes){
+  let b64='';
+  const CHUNK=8192;
+  for(let i=0;i<bytes.length;i+=CHUNK){
+    b64+=btoa(String.fromCharCode(...bytes.subarray(i,i+CHUNK)));
+  }
+  return b64;
+}
+
+async function splitPDF(base64Data,name,chunkSize=90){
+  if(typeof PDFLib==='undefined'){
+    throw new Error('No se pudo cargar pdf-lib. Verifica tu conexión a internet e intenta de nuevo.');
+  }
+  const {PDFDocument}=PDFLib;
+  let src;
+  try{
+    const raw=atob(base64Data);
+    const bytes=new Uint8Array(raw.length);
+    for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+    src=await PDFDocument.load(bytes,{ignoreEncryption:true});
+  }catch(e){
+    throw new Error(`No se pudo leer el PDF "${name}": ${e.message}`);
+  }
+  const total=src.getPageCount();
+  if(total<=100)return [{type:'pdf',base64:base64Data,name}];
+  addLog(`"${name}" tiene ${total} págs. — dividiéndolo en fragmentos de ${chunkSize}...`);
+  const chunks=[];
+  for(let start=0;start<total;start+=chunkSize){
+    const end=Math.min(start+chunkSize,total);
+    const doc=await PDFDocument.create();
+    const idxs=Array.from({length:end-start},(_,i)=>start+i);
+    const copied=await doc.copyPages(src,idxs);
+    copied.forEach(p=>doc.addPage(p));
+    const saved=await doc.save();
+    chunks.push({type:'pdf',base64:uint8ToBase64(saved),name:`${name} [págs ${start+1}-${end}]`});
+    addLog(`  Fragmento ${chunks.length}: págs ${start+1}–${end} listo`);
+  }
+  return chunks;
+}
+
+function readFile(file){
+  return new Promise(resolve=>{
+    const e=gExt(file.name);
+    if(e==='pdf'){
+      const r=new FileReader();
+      r.onload=ev=>resolve({type:'pdf',base64:ev.target.result.split(',')[1],name:file.name});
+      r.readAsDataURL(file);
+    }else{
+      const r=new FileReader();
+      r.onload=ev=>{
+        let text=ev.target.result||'';
+        if(['doc','docx','xls','xlsx'].includes(e)){
+          text=text.replace(/[^\x20-\x7EáéíóúüñÁÉÍÓÚÜÑ\n\r\t.,;:()\-]/g,' ').replace(/\s+/g,' ').trim();
+          if(text.length<80)text=`[Archivo: ${file.name}. Usa PDF o TXT para mejor extracción.]`;
+        }
+        resolve(text.slice(0,80000));
+      };
+      r.onerror=()=>resolve(`[Error leyendo: ${file.name}]`);
+      r.readAsText(file,'utf-8');
+    }
+  });
+}
+
+async function callClaude(contents,apiKey){
+  const msgContent=[];
+  for(const c of contents){
+    if(c&&c.type==='pdf'){
+      const chunks=await splitPDF(c.base64,c.name);
+      if(chunks.length>1)addLog(`PDF grande detectado — dividido en ${chunks.length} partes para análisis completo`);
+      for(const ch of chunks){
+        msgContent.push({type:'document',source:{type:'base64',media_type:'application/pdf',data:ch.base64}});
+        msgContent.push({type:'text',text:`(PDF: ${ch.name})`});
+      }
+    }else if(typeof c==='string'&&c.trim()){
+      msgContent.push({type:'text',text:c});
+    }
+  }
+  msgContent.push({type:'text',text:`
+Eres ATLAS, sistema experto en análisis de investigaciones académicas con impacto social.
+
+Analiza el contenido de los documentos y devuelve ÚNICAMENTE un objeto JSON válido, sin texto extra, sin bloques markdown.
+
+ESTRUCTURA OBLIGATORIA (completa con información REAL del documento):
+
+{
+  "sinopsis": "Párrafo de 4-6 oraciones resumiendo la investigación de forma clara y evocadora",
+
+  "tematicas": [
+    {"tema": "Nombre de la temática principal", "porcentaje": 28, "razon": "Por qué tiene mayor impacto social"},
+    {"tema": "Segunda temática", "porcentaje": 22, "razon": "Razón de su peso"},
+    {"tema": "Tercera", "porcentaje": 18, "razon": "Razón"},
+    {"tema": "Cuarta", "porcentaje": 14, "razon": "Razón"},
+    {"tema": "Quinta", "porcentaje": 11, "razon": "Razón"},
+    {"tema": "Sexta", "porcentaje": 7, "razon": "Razón"}
+  ],
+
+  "apropiacion": {
+    "descripcion": "Párrafo sobre cómo esta investigación puede apropiarse socialmente",
+    "niveles": [
+      {"nivel": "Comunidad directa", "descripcion": "descripción concreta"},
+      {"nivel": "Regional", "descripcion": "descripción concreta"},
+      {"nivel": "Nacional", "descripcion": "descripción concreta"},
+      {"nivel": "Internacional", "descripcion": "descripción concreta"}
+    ]
+  },
+
+  "cambios": [
+    {"horizonte": "Corto plazo (1-2 años)", "descripcion": "cambio específico"},
+    {"horizonte": "Mediano plazo (3-5 años)", "descripcion": "cambio específico"},
+    {"horizonte": "Largo plazo (10+ años)", "descripcion": "cambio sistémico"},
+    {"horizonte": "Cambio estructural", "descripcion": "transformación cultural o institucional"}
+  ],
+
+  "territorios": {
+    "intro": "Párrafo breve explicando dónde puede tener mayor incidencia este conocimiento y por qué, más allá de donde se realizó la investigación",
+    "lugares": [
+      {"nombre": "Nombre del territorio o región", "alcance": "Nacional Colombia", "razon": "Por qué este conocimiento puede incidir aquí significativamente"},
+      {"nombre": "Otro territorio", "alcance": "Nacional Colombia", "razon": "Razón específica"},
+      {"nombre": "País o región internacional", "alcance": "Internacional", "razon": "Por qué esta investigación puede ayudar aquí"},
+      {"nombre": "Otro lugar internacional", "alcance": "Internacional", "razon": "Razón de la incidencia"}
+    ]
+  },
+
+  "objetivos": {
+    "general": "Objetivo general real de la investigación",
+    "especificos": ["objetivo 1", "objetivo 2", "objetivo 3", "objetivo 4"]
+  },
+
+  "publicos": [
+    {"nombre": "Público principal", "porcentaje": 30, "descripcion": "Por qué es el público de mayor impacto"},
+    {"nombre": "Segundo público", "porcentaje": 24, "descripcion": "Razón"},
+    {"nombre": "Tercero", "porcentaje": 18, "descripcion": "Razón"},
+    {"nombre": "Cuarto", "porcentaje": 14, "descripcion": "Razón"},
+    {"nombre": "Quinto", "porcentaje": 9, "descripcion": "Razón"},
+    {"nombre": "Sexto", "porcentaje": 5, "descripcion": "Razón"}
+  ],
+
+  "soluciones": [
+    {"icono": "🌱", "accion": "Nombre corto de la acción social", "descripcion": "Qué resuelve este conocimiento en la sociedad y cómo se puede usar para generar cambio real", "impacto": "Alto"},
+    {"icono": "🤝", "accion": "Segunda acción", "descripcion": "Descripción del impacto social", "impacto": "Alto"},
+    {"icono": "📚", "accion": "Tercera acción", "descripcion": "Descripción", "impacto": "Medio"},
+    {"icono": "🔬", "accion": "Cuarta acción", "descripcion": "Descripción", "impacto": "Medio"}
+  ],
+
+  "tipologias": [
+    {"nombre": "Tipo de contenido", "descripcion": "Por qué aplica para esta investigación"},
+    {"nombre": "Tipo", "descripcion": "Razón"},
+    {"nombre": "Tipo", "descripcion": "Razón"},
+    {"nombre": "Tipo", "descripcion": "Razón"}
+  ],
+
+  "formatos": [
+    {"formato": "Documental", "puntuacion": 85, "razon": "Por qué es el formato más conveniente para la apropiación social de ESTE conocimiento específico", "tag": "Muy recomendado"},
+    {"formato": "Web interactiva", "puntuacion": 78, "razon": "Razón específica para esta investigación", "tag": "Recomendado"},
+    {"formato": "Podcast", "puntuacion": 72, "razon": "Razón", "tag": "Recomendado"},
+    {"formato": "Video explicativo", "puntuacion": 65, "razon": "Razón", "tag": "Viable"},
+    {"formato": "Redes sociales", "puntuacion": 60, "razon": "Razón", "tag": "Viable"},
+    {"formato": "Juego web / móvil", "puntuacion": 55, "razon": "Razón", "tag": "Viable"},
+    {"formato": "Exposición física", "puntuacion": 48, "razon": "Razón", "tag": "Considerar"},
+    {"formato": "Experiencia inmersiva / VR", "puntuacion": 40, "razon": "Razón", "tag": "Explorar"},
+    {"formato": "Performance / teatro", "puntuacion": 35, "razon": "Razón", "tag": "Explorar"},
+    {"formato": "Juego físico / de mesa", "puntuacion": 30, "razon": "Razón", "tag": "Explorar"}
+  ]
+}
+
+Los porcentajes de temáticas deben sumar 100. Los de públicos deben sumar 100.
+En formatos, ordena de mayor a menor puntuación según cuál es más conveniente para generar apropiación social de ESTE conocimiento específico.
+Toda la información debe ser REAL y específica al documento analizado. Responde SOLO con el JSON.`
+  });
+
+  const res=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'x-api-key':apiKey,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body:JSON.stringify({
+      model:'claude-opus-4-5',
+      max_tokens:8000,
+      messages:[{role:'user',content:msgContent}]
+    })
+  });
+
+  if(!res.ok){const err=await res.json();throw new Error(err.error?.message||'Error HTTP '+res.status);}
+  const data=await res.json();
+  let raw=(data.content||[]).find(b=>b.type==='text')?.text||'';
+  raw=raw.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+  const s=raw.indexOf('{'),e=raw.lastIndexOf('}');
+  if(s===-1||e===-1)throw new Error('La IA no devolvió JSON válido. Revisa tu API key.');
+  return JSON.parse(raw.slice(s,e+1));
+}
+
+let ANALYSIS=null;
+const LOGS=['Leyendo archivos cargados...','Extrayendo corpus textual...','Enviando a Claude para análisis profundo...','Identificando temáticas y su peso social...','Mapeando territorios de incidencia...','Analizando públicos y su relevancia...','Generando soluciones de impacto social...','Evaluando formatos de apropiación...','Ensamblando visualizaciones...'];
+
+async function startAnalysis(){
+  const apiKey=document.getElementById('apiKey').value.trim();
+  if(!apiKey){showError('Ingresa tu API key de Anthropic. Obtenerla en console.anthropic.com → API Keys');return;}
+  if(FILES.length===0)return;
+  clearError();
+  const btn=document.getElementById('analyzeBtn');
+  btn.disabled=true;
+  const s=document.createElement('style');s.textContent='@keyframes spin{to{transform:rotate(360deg);}}';document.head.appendChild(s);
+  btn.innerHTML='<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block;"></i> Analizando...';
+  const pw=document.getElementById('progressWrap');
+  pw.classList.add('active');
+  document.getElementById('progLog').innerHTML='';
+  setProg(0);
+  document.getElementById('dimsSection').classList.remove('active');
+  document.getElementById('resultPanel').classList.remove('active');
+
+  let li=0;
+  const lt=setInterval(()=>{if(li<LOGS.length-2){addLog(LOGS[li++]);setProg(Math.round(li/LOGS.length*65));}},800);
+
+  try{
+    addLog('Leyendo archivos...');setProg(5);
+    const contents=await Promise.all(FILES.map(readFile));
+    clearInterval(lt);
+    addLog('Enviando documentos a Claude...');setProg(45);
+    ANALYSIS=await callClaude(contents,apiKey);
+    addLog('Estructurando 10 dimensiones...');setProg(90);
+    addLog('¡Análisis completado!');setProg(100);
+    setTimeout(()=>{
+      btn.innerHTML='<i class="ti ti-check"></i> Análisis completado';
+      btn.classList.add('done');btn.disabled=true;
+      const dz2=document.getElementById('dropZone');
+      dz2.classList.add('done');
+      document.getElementById('dropMain').textContent=FILES.length===1?'1 documento analizado':FILES.length+' documentos analizados';
+      document.getElementById('dropHint').textContent='Selecciona una dimensión para explorar el análisis';
+      buildDimButtons();
+      document.getElementById('dimsSection').classList.add('active');
+      setTimeout(()=>showDim('sinopsis'),200);
+    },500);
+  }catch(err){
+    clearInterval(lt);
+    addLog('Error: '+err.message);
+    let userMsg='Error: '+err.message;
+    if(err.message&&err.message.toLowerCase().includes('100 pdf pages')){
+      userMsg='El PDF superó el límite de páginas incluso después de intentar dividirlo.\n\nPor favor repórtalo como un bug. Mientras tanto, divide el PDF manualmente en partes de máximo 90 páginas usando ilovepdf.com o Adobe Acrobat.';
+    }else if(err.message&&(err.message.includes('401')||err.message.toLowerCase().includes('authentication')||err.message.toLowerCase().includes('invalid x-api-key'))){
+      userMsg='API key inválida o vencida.\n\nObtén una clave válida en console.anthropic.com → API Keys';
+    }
+    showError(userMsg);
+    btn.disabled=false;btn.classList.remove('done');
+    btn.innerHTML='<i class="ti ti-sparkles"></i> Analizar investigación';
+  }
+}
+
+function buildDimButtons(){
+  const grid=document.getElementById('dimsGrid');grid.innerHTML='';
+  DIMS.forEach(d=>{
+    const btn=document.createElement('button');
+    btn.className='dim-btn';btn.id='db-'+d.id;
+    btn.innerHTML=`<span class="dim-nm">${d.label}</span>`;
+    btn.onclick=()=>showDim(d.id);
+    grid.appendChild(btn);
+  });
+}
+
+function showDim(id){
+  document.querySelectorAll('.dim-btn').forEach(b=>b.classList.remove('active'));
+  const db=document.getElementById('db-'+id);if(db)db.classList.add('active');
+  if(!ANALYSIS)return;
+  const dim=DIMS.find(d=>d.id===id);
+  const inner=document.getElementById('rpanelInner');
+  inner.innerHTML=`<div class="rpanel-title">${dim.label}</div>`+buildContent(id,ANALYSIS);
+  const panel=document.getElementById('resultPanel');
+  panel.classList.add('active');
+  setTimeout(()=>{
+    // Animate bar fills
+    document.querySelectorAll('[data-w]').forEach(el=>{el.style.width=el.dataset.w+'%';});
+    // Draw donut if publicos
+    if(id==='publicos')drawDonut();
+    // Animate format rings
+    if(id==='formatos')animateRings();
+    panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+  },80);
+}
+
+/* ── CONTENT BUILDERS ── */
+function buildContent(id,d){
+  switch(id){
+
+    case 'sinopsis':
+      return `<div class="rquote">${d.sinopsis||'Sin información.'}</div>`;
+
+    case 'tematicas': {
+      const temas=d.tematicas||[];
+      const rows=temas.map((t,i)=>`
+        <div class="tema-item">
+          <div class="tema-label">${t.tema}</div>
+          <div class="tema-bar-wrap">
+            <div class="tema-bar-bg">
+              <div class="tema-bar-fill" data-w="${t.porcentaje}" style="width:0%;background:${pc(i)};"></div>
+            </div>
+            <span class="tema-pct" style="color:${pc(i)};">${t.porcentaje}%</span>
+          </div>
+        </div>
+        ${t.razon?`<div class="tema-note" style="padding-left:150px;">${t.razon}</div>`:''}
+      `).join('');
+      return `<div class="tema-row">${rows}</div>`;
+    }
+
+    case 'apropiacion': {
+      const apr=d.apropiacion||{};
+      return `<div class="rquote" style="margin-bottom:11px;">${apr.descripcion||''}</div>
+        <div class="rcards">${(apr.niveles||[]).map((n,i)=>`
+          <div class="rcard" style="border-left-color:${pc(i)};">
+            <div class="rcard-t" style="color:${pc(i)};">${n.nivel}</div>
+            <div class="rcard-b">${n.descripcion}</div>
+          </div>`).join('')}</div>`;
+    }
+
+    case 'cambios': {
+      const cc=['#6BAB6E','#E8821A','#4A7FB5','#C4547A'];
+      return `<div class="rgrid2">${(d.cambios||[]).map((c,i)=>`
+        <div class="rcard" style="border-left-color:${cc[i]||pc(i)};">
+          <div class="rcard-t" style="color:${cc[i]||pc(i)};">${c.horizonte}</div>
+          <div class="rcard-b">${c.descripcion}</div>
+        </div>`).join('')}</div>`;
+    }
+
+    case 'territorios': {
+      const terr=d.territorios||{};
+      const cols=['#C4547A','#E8821A','#4A7FB5','#5BA8A0','#6BAB6E','#C94040'];
+      const cards=(terr.lugares||[]).map((t,i)=>`
+        <div class="terr-card" style="border-top-color:${cols[i%cols.length]};">
+          <div class="terr-scope" style="color:${cols[i%cols.length]};">${t.alcance||''}</div>
+          <div class="terr-name">${t.nombre}</div>
+          <div class="terr-why">${t.razon}</div>
+        </div>`).join('');
+      return `<div class="terr-intro">${terr.intro||''}</div>
+        <div class="terr-grid">${cards}</div>`;
+    }
+
+    case 'objetivos': {
+      const obj=d.objetivos||{};
+      return `<div class="rcard" style="border-left-color:#C4547A;margin-bottom:11px;">
+          <div class="rcard-t" style="color:#C4547A;">Objetivo general</div>
+          <div class="rcard-b">${obj.general||''}</div>
+        </div>
+        <div class="rcards">${(obj.especificos||[]).map((e,i)=>`
+          <div class="rcard" style="border-left-color:${pc(i+1)}80;">
+            <div class="rcard-b">${i+1}. ${e}</div>
+          </div>`).join('')}</div>`;
+    }
+
+    case 'publicos': {
+      const pubs=d.publicos||[];
+      const items=pubs.map((p,i)=>`
+        <div class="pub-item">
+          <div class="pub-dot" style="background:${pc(i)};"></div>
+          <div class="pub-info">
+            <div class="pub-name">${p.nombre}</div>
+            <div class="pub-bar-bg">
+              <div class="pub-bar-fill" data-w="${p.porcentaje}" style="width:0%;background:${pc(i)};"></div>
+            </div>
+          </div>
+          <span class="pub-pct-lbl" style="color:${pc(i)};">${p.porcentaje}%</span>
+        </div>`).join('');
+      return `<div class="pub-layout">
+        <div class="pub-canvas-wrap">
+          <canvas id="donutCanvas" width="170" height="170"></canvas>
+          <div class="pub-center-label">
+            <span class="pub-center-n">${pubs.length}</span>
+            <span class="pub-center-s">públicos</span>
+          </div>
+        </div>
+        <div class="pub-list">${items}</div>
+      </div>`;
+    }
+
+    case 'soluciones': {
+      const sols=d.soluciones||[];
+      const impColors={'Alto':'#6BAB6E','Medio':'#E8821A','Bajo':'#8A8078'};
+      const cards=sols.map((s,i)=>`
+        <div class="sol-card" style="--sol-c:${pc(i)};">
+          <span class="sol-icon">${s.icono||'💡'}</span>
+          <div class="sol-action">${s.accion}</div>
+          <div class="sol-desc">${s.descripcion}</div>
+          <div class="sol-impact">
+            <span style="width:6px;height:6px;border-radius:50%;background:${impColors[s.impacto]||'#8A8078'};display:inline-block;"></span>
+            Impacto ${s.impacto||''}
+          </div>
+        </div>`).join('');
+      return `<div class="sol-grid">${cards}</div>`;
+    }
+
+    case 'tipologias': {
+      return `<div class="rgrid2">${(d.tipologias||[]).map((t,i)=>`
+        <div class="rcard" style="border-left-color:${pc(i)};">
+          <div class="rcard-t" style="color:${pc(i)};">${t.nombre}</div>
+          <div class="rcard-b">${t.descripcion}</div>
+        </div>`).join('')}</div>`;
+    }
+
+    case 'formatos': {
+      const tagColors={'Muy recomendado':'#6BAB6E','Recomendado':'#4A7FB5','Viable':'#E8821A','Considerar':'#8A8078','Explorar':'#D4C9BE'};
+      const cards=(d.formatos||[]).map((f,i)=>{
+        const circ=2*Math.PI*20;
+        const dash=((f.puntuacion/100)*circ).toFixed(1);
+        const c=pc(i);
+        return `<div class="fmt-card">
+          <div class="fmt-score-ring">
+            <svg viewBox="0 0 52 52">
+              <circle class="fmt-ring-bg" cx="26" cy="26" r="20"/>
+              <circle class="fmt-ring-fill" cx="26" cy="26" r="20"
+                stroke="${c}"
+                stroke-dasharray="${circ.toFixed(1)}"
+                stroke-dashoffset="${circ.toFixed(1)}"
+                data-dash="${circ.toFixed(1)}"
+                data-fill="${(circ-dash).toFixed(1)}"
+                id="ring-${i}"/>
+            </svg>
+            <div class="fmt-score-num" style="color:${c};">${f.puntuacion}</div>
+          </div>
+          <div class="fmt-info">
+            <div class="fmt-name">${f.formato}</div>
+            <div class="fmt-reason">${f.razon}</div>
+            <span class="fmt-tag" style="color:${tagColors[f.tag]||'#8A8078'};border-color:${tagColors[f.tag]||'#8A8078'}60;background:${tagColors[f.tag]||'#8A8078'}10;">${f.tag||''}</span>
+          </div>
+        </div>`;
+      }).join('');
+      return `<div class="fmt-grid">${cards}</div>`;
+    }
+
+    default: return '<p style="color:var(--gray);font-size:11px;">Sin datos.</p>';
+  }
+}
+
+function drawDonut(){
+  const canvas=document.getElementById('donutCanvas');
+  if(!canvas||!ANALYSIS)return;
+  const pubs=ANALYSIS.publicos||[];
+  const ctx=canvas.getContext('2d');
+  const cx=85,cy=85,r=68,inner=46;
+  ctx.clearRect(0,0,170,170);
+  let start=-Math.PI/2;
+  pubs.forEach((p,i)=>{
+    const slice=(p.porcentaje/100)*2*Math.PI;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,r,start,start+slice);
+    ctx.closePath();
+    ctx.fillStyle=PAL[i%PAL.length];
+    ctx.fill();
+    start+=slice;
+  });
+  ctx.beginPath();
+  ctx.arc(cx,cy,inner,0,2*Math.PI);
+  ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--cream')||'#F0E8DC';
+  ctx.fill();
+}
+
+function animateRings(){
+  document.querySelectorAll('.fmt-ring-fill').forEach(el=>{
+    const full=parseFloat(el.getAttribute('data-dash'));
+    const fill=parseFloat(el.getAttribute('data-fill'));
+    el.style.strokeDashoffset=full;
+    setTimeout(()=>{
+      el.style.transition='stroke-dashoffset 1s ease';
+      el.style.strokeDashoffset=fill;
+    },100);
+  });
+}
+</script>
+</body>
+</html>
