@@ -327,7 +327,7 @@ function uint8ToBase64(bytes){
   return b64;
 }
 
-async function splitPDF(base64Data,name,chunkSize=90){
+async function splitPDF(base64Data,name,chunkSize=20){
   if(typeof PDFLib==='undefined'){
     throw new Error('No se pudo cargar pdf-lib. Verifica tu conexión a internet e intenta de nuevo.');
   }
@@ -342,7 +342,9 @@ async function splitPDF(base64Data,name,chunkSize=90){
     throw new Error(`No se pudo leer el PDF "${name}": ${e.message}`);
   }
   const total=src.getPageCount();
-  if(total<=100)return [{type:'pdf',base64:base64Data,name}];
+  // PDFs pequeños (≤15 págs) se envían directo; el resto siempre se fragmenta
+  // para evitar superar el límite de 200K tokens (PDFs de imágenes cuestan ~1500 tokens/pág)
+  if(total<=15)return [{type:'pdf',base64:base64Data,name}];
   addLog(`"${name}" tiene ${total} págs. — dividiéndolo en fragmentos de ${chunkSize}...`);
   const chunks=[];
   for(let start=0;start<total;start+=chunkSize){
