@@ -320,7 +320,7 @@ function clearError(){document.getElementById('errorBox').innerHTML='';}
 
 function uint8ToBase64(bytes){
   let b64='';
-  const CHUNK=8192;
+  const CHUNK=12288; // múltiplo de 3 → sin padding intermedio
   for(let i=0;i<bytes.length;i+=CHUNK){
     b64+=btoa(String.fromCharCode(...bytes.subarray(i,i+CHUNK)));
   }
