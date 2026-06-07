@@ -381,22 +381,7 @@ function readFile(file){
   });
 }
 
-async function callClaude(contents,apiKey){
-  const msgContent=[];
-  for(const c of contents){
-    if(c&&c.type==='pdf'){
-      const chunks=await splitPDF(c.base64,c.name);
-      if(chunks.length>1)addLog(`PDF grande detectado — dividido en ${chunks.length} partes para análisis completo`);
-      for(const ch of chunks){
-        msgContent.push({type:'document',source:{type:'base64',media_type:'application/pdf',data:ch.base64}});
-        msgContent.push({type:'text',text:`(PDF: ${ch.name})`});
-      }
-    }else if(typeof c==='string'&&c.trim()){
-      msgContent.push({type:'text',text:c});
-    }
-  }
-  msgContent.push({type:'text',text:`
-Eres ATLAS, sistema experto en análisis de investigaciones académicas con impacto social.
+const ANALYSIS_PROMPT=`Eres ATLAS, sistema experto en análisis de investigaciones académicas con impacto social.
 
 Analiza el contenido de los documentos y devuelve ÚNICAMENTE un objeto JSON válido, sin texto extra, sin bloques markdown.
 
@@ -485,9 +470,9 @@ ESTRUCTURA OBLIGATORIA (completa con información REAL del documento):
 
 Los porcentajes de temáticas deben sumar 100. Los de públicos deben sumar 100.
 En formatos, ordena de mayor a menor puntuación según cuál es más conveniente para generar apropiación social de ESTE conocimiento específico.
-Toda la información debe ser REAL y específica al documento analizado. Responde SOLO con el JSON.`
-  });
+Toda la información debe ser REAL y específica al documento analizado. Responde SOLO con el JSON.`;
 
+async function doAPICall(content,apiKey,maxTokens=8000){
   const res=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
     headers:{
@@ -496,16 +481,73 @@ Toda la información debe ser REAL y específica al documento analizado. Respond
       'anthropic-version':'2023-06-01',
       'anthropic-dangerous-direct-browser-access':'true'
     },
-    body:JSON.stringify({
-      model:'claude-opus-4-5',
-      max_tokens:8000,
-      messages:[{role:'user',content:msgContent}]
-    })
+    body:JSON.stringify({model:'claude-opus-4-5',max_tokens:maxTokens,messages:[{role:'user',content}]})
   });
-
   if(!res.ok){const err=await res.json();throw new Error(err.error?.message||'Error HTTP '+res.status);}
   const data=await res.json();
-  let raw=(data.content||[]).find(b=>b.type==='text')?.text||'';
+  return (data.content||[]).find(b=>b.type==='text')?.text||'';
+}
+
+async function summarizeChunk(base64,chunkNum,totalChunks,docName,apiKey){
+  const content=[
+    {type:'document',source:{type:'base64',media_type:'application/pdf',data:base64}},
+    {type:'text',text:`Eres un asistente de investigación. Este es el fragmento ${chunkNum} de ${totalChunks} del documento "${docName}".
+Extrae y resume en detalle (máximo 1500 palabras, en español):
+- Tema principal, objetivo y preguntas de investigación
+- Metodología y enfoque utilizado
+- Hallazgos, datos y resultados clave
+- Actores, instituciones y territorios mencionados
+- Conclusiones y recomendaciones
+Responde solo con el resumen en texto libre.`}
+  ];
+  return await doAPICall(content,apiKey,2000);
+}
+
+async function callClaude(contents,apiKey){
+  const directBlocks=[];  // bloques ya listos para el mensaje final
+  const chunkedPDFs=[];   // PDFs que requieren llamadas intermedias
+
+  for(const c of contents){
+    if(c&&c.type==='pdf'){
+      const chunks=await splitPDF(c.base64,c.name);
+      if(chunks.length===1){
+        directBlocks.push({kind:'pdf',chunk:chunks[0]});
+      }else{
+        addLog(`"${c.name}": ${chunks.length} fragmentos — procesando en llamadas separadas...`);
+        chunkedPDFs.push({name:c.name,chunks});
+      }
+    }else if(typeof c==='string'&&c.trim()){
+      directBlocks.push({kind:'text',text:c});
+    }
+  }
+
+  // Resumir cada fragmento de PDFs grandes en llamadas independientes
+  for(const pdf of chunkedPDFs){
+    const sums=[];
+    for(let i=0;i<pdf.chunks.length;i++){
+      addLog(`Extrayendo contenido — fragmento ${i+1}/${pdf.chunks.length} de "${pdf.name}"...`);
+      setProg(45+Math.round(((i+1)/pdf.chunks.length)*25));
+      const summary=await summarizeChunk(pdf.chunks[i].base64,i+1,pdf.chunks.length,pdf.name,apiKey);
+      sums.push(`=== Fragmento ${i+1}/${pdf.chunks.length} ===\n${summary}`);
+    }
+    directBlocks.push({kind:'text',text:`CONTENIDO COMPLETO DE "${pdf.name}":\n\n${sums.join('\n\n')}`});
+  }
+
+  // Construir mensaje final de síntesis
+  const msgContent=[];
+  for(const b of directBlocks){
+    if(b.kind==='pdf'){
+      msgContent.push({type:'document',source:{type:'base64',media_type:'application/pdf',data:b.chunk.base64}});
+      msgContent.push({type:'text',text:`(PDF: ${b.chunk.name})`});
+    }else{
+      msgContent.push({type:'text',text:b.text});
+    }
+  }
+  msgContent.push({type:'text',text:ANALYSIS_PROMPT});
+
+  addLog('Generando análisis completo de 10 dimensiones...');
+  setProg(75);
+  let raw=await doAPICall(msgContent,apiKey,8000);
   raw=raw.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
   const s=raw.indexOf('{'),e=raw.lastIndexOf('}');
   if(s===-1||e===-1)throw new Error('La IA no devolvió JSON válido. Revisa tu API key.');
