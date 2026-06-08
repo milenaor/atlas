@@ -8,7 +8,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
-<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -204,7 +203,7 @@ input[type=file]{display:none;}
   <label class="browse-lbl" for="fileInput">
     <i class="ti ti-folder-open"></i> Buscar en tu computador
   </label>
-  <div style="font-size:8px;color:var(--gray);opacity:.5;margin-top:10px;">PDFs extensos se dividen automáticamente para análisis completo</div>
+  <div style="font-size:8px;color:var(--gray);opacity:.5;margin-top:10px;">PDF: máximo 100 páginas · documentos de texto sin límite</div>
 </div>
 <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt">
 
@@ -318,47 +317,6 @@ function setProg(p){document.getElementById('pbFill').style.width=p+'%';}
 function showError(msg){document.getElementById('errorBox').innerHTML=`<div class="error-box"><i class="ti ti-alert-circle" style="margin-right:6px;"></i>${msg.replace(/\n/g,'<br>')}</div>`;}
 function clearError(){document.getElementById('errorBox').innerHTML='';}
 
-function uint8ToBase64(bytes){
-  let b64='';
-  const CHUNK=12288; // múltiplo de 3 → sin padding intermedio
-  for(let i=0;i<bytes.length;i+=CHUNK){
-    b64+=btoa(String.fromCharCode(...bytes.subarray(i,i+CHUNK)));
-  }
-  return b64;
-}
-
-async function splitPDF(base64Data,name,chunkSize=20){
-  if(typeof PDFLib==='undefined'){
-    throw new Error('No se pudo cargar pdf-lib. Verifica tu conexión a internet e intenta de nuevo.');
-  }
-  const {PDFDocument}=PDFLib;
-  let src;
-  try{
-    const raw=atob(base64Data);
-    const bytes=new Uint8Array(raw.length);
-    for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
-    src=await PDFDocument.load(bytes,{ignoreEncryption:true});
-  }catch(e){
-    throw new Error(`No se pudo leer el PDF "${name}": ${e.message}`);
-  }
-  const total=src.getPageCount();
-  // PDFs pequeños (≤15 págs) se envían directo; el resto siempre se fragmenta
-  // para evitar superar el límite de 200K tokens (PDFs de imágenes cuestan ~1500 tokens/pág)
-  if(total<=15)return [{type:'pdf',base64:base64Data,name}];
-  addLog(`"${name}" tiene ${total} págs. — dividiéndolo en fragmentos de ${chunkSize}...`);
-  const chunks=[];
-  for(let start=0;start<total;start+=chunkSize){
-    const end=Math.min(start+chunkSize,total);
-    const doc=await PDFDocument.create();
-    const idxs=Array.from({length:end-start},(_,i)=>start+i);
-    const copied=await doc.copyPages(src,idxs);
-    copied.forEach(p=>doc.addPage(p));
-    const saved=await doc.save();
-    chunks.push({type:'pdf',base64:uint8ToBase64(saved),name:`${name} [págs ${start+1}-${end}]`});
-    addLog(`  Fragmento ${chunks.length}: págs ${start+1}–${end} listo`);
-  }
-  return chunks;
-}
 
 function readFile(file){
   return new Promise(resolve=>{
@@ -474,7 +432,18 @@ Los porcentajes de temáticas deben sumar 100. Los de públicos deben sumar 100.
 En formatos, ordena de mayor a menor puntuación según cuál es más conveniente para generar apropiación social de ESTE conocimiento específico.
 Toda la información debe ser REAL y específica al documento analizado. Responde SOLO con el JSON.`;
 
-async function doAPICall(content,apiKey,maxTokens=8000){
+async function callClaude(contents,apiKey){
+  const msgContent=[];
+  for(const c of contents){
+    if(c&&c.type==='pdf'){
+      msgContent.push({type:'document',source:{type:'base64',media_type:'application/pdf',data:c.base64}});
+      msgContent.push({type:'text',text:`(PDF: ${c.name})`});
+    }else if(typeof c==='string'&&c.trim()){
+      msgContent.push({type:'text',text:c});
+    }
+  }
+  msgContent.push({type:'text',text:ANALYSIS_PROMPT});
+
   const res=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
     headers:{
@@ -483,73 +452,11 @@ async function doAPICall(content,apiKey,maxTokens=8000){
       'anthropic-version':'2023-06-01',
       'anthropic-dangerous-direct-browser-access':'true'
     },
-    body:JSON.stringify({model:'claude-opus-4-5',max_tokens:maxTokens,messages:[{role:'user',content}]})
+    body:JSON.stringify({model:'claude-opus-4-5',max_tokens:8000,messages:[{role:'user',content:msgContent}]})
   });
   if(!res.ok){const err=await res.json();throw new Error(err.error?.message||'Error HTTP '+res.status);}
   const data=await res.json();
-  return (data.content||[]).find(b=>b.type==='text')?.text||'';
-}
-
-async function summarizeChunk(base64,chunkNum,totalChunks,docName,apiKey){
-  const content=[
-    {type:'document',source:{type:'base64',media_type:'application/pdf',data:base64}},
-    {type:'text',text:`Eres un asistente de investigación. Este es el fragmento ${chunkNum} de ${totalChunks} del documento "${docName}".
-Extrae y resume en detalle (máximo 1500 palabras, en español):
-- Tema principal, objetivo y preguntas de investigación
-- Metodología y enfoque utilizado
-- Hallazgos, datos y resultados clave
-- Actores, instituciones y territorios mencionados
-- Conclusiones y recomendaciones
-Responde solo con el resumen en texto libre.`}
-  ];
-  return await doAPICall(content,apiKey,2000);
-}
-
-async function callClaude(contents,apiKey){
-  const directBlocks=[];  // bloques ya listos para el mensaje final
-  const chunkedPDFs=[];   // PDFs que requieren llamadas intermedias
-
-  for(const c of contents){
-    if(c&&c.type==='pdf'){
-      const chunks=await splitPDF(c.base64,c.name);
-      if(chunks.length===1){
-        directBlocks.push({kind:'pdf',chunk:chunks[0]});
-      }else{
-        addLog(`"${c.name}": ${chunks.length} fragmentos — procesando en llamadas separadas...`);
-        chunkedPDFs.push({name:c.name,chunks});
-      }
-    }else if(typeof c==='string'&&c.trim()){
-      directBlocks.push({kind:'text',text:c});
-    }
-  }
-
-  // Resumir cada fragmento de PDFs grandes en llamadas independientes
-  for(const pdf of chunkedPDFs){
-    const sums=[];
-    for(let i=0;i<pdf.chunks.length;i++){
-      addLog(`Extrayendo contenido — fragmento ${i+1}/${pdf.chunks.length} de "${pdf.name}"...`);
-      setProg(45+Math.round(((i+1)/pdf.chunks.length)*25));
-      const summary=await summarizeChunk(pdf.chunks[i].base64,i+1,pdf.chunks.length,pdf.name,apiKey);
-      sums.push(`=== Fragmento ${i+1}/${pdf.chunks.length} ===\n${summary}`);
-    }
-    directBlocks.push({kind:'text',text:`CONTENIDO COMPLETO DE "${pdf.name}":\n\n${sums.join('\n\n')}`});
-  }
-
-  // Construir mensaje final de síntesis
-  const msgContent=[];
-  for(const b of directBlocks){
-    if(b.kind==='pdf'){
-      msgContent.push({type:'document',source:{type:'base64',media_type:'application/pdf',data:b.chunk.base64}});
-      msgContent.push({type:'text',text:`(PDF: ${b.chunk.name})`});
-    }else{
-      msgContent.push({type:'text',text:b.text});
-    }
-  }
-  msgContent.push({type:'text',text:ANALYSIS_PROMPT});
-
-  addLog('Generando análisis completo de 10 dimensiones...');
-  setProg(75);
-  let raw=await doAPICall(msgContent,apiKey,8000);
+  let raw=(data.content||[]).find(b=>b.type==='text')?.text||'';
   raw=raw.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
   const s=raw.indexOf('{'),e=raw.lastIndexOf('}');
   if(s===-1||e===-1)throw new Error('La IA no devolvió JSON válido. Revisa tu API key.');
