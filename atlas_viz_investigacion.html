@@ -35,7 +35,7 @@ html,body{min-height:100vh;background:#E8E0D5;font-family:'DM Mono','Courier New
 .eyebrow{font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--pink);margin-bottom:10px;opacity:.85;}
 .hero-title{font-family:'Playfair Display',serif;font-size:24px;color:var(--dark);line-height:1.3;margin-bottom:6px;}
 .hero-title em{color:var(--pink);font-style:italic;}
-.hero-desc{font-size:10px;color:var(--gray);letter-spacing:.04em;line-height:1.75;max-width:420px;margin:0 auto 22px;}
+.hero-desc{font-size:10px;color:var(--gray);letter-spacing:.04em;line-height:1.75;max-width:620px;margin:0 auto 22px;}
 
 .drop-zone{margin:0 28px;border:1.5px dashed var(--lt);border-radius:14px;background:var(--cream);padding:28px 24px 22px;text-align:center;transition:all .3s;}
 .drop-zone.over{border-color:var(--pink);background:#FBF0F4;}
@@ -187,9 +187,9 @@ input[type=file]{display:none;}
 </div>
 
 <div class="hero">
-  <div class="eyebrow">— Plataforma de visualización de tu investigación —</div>
-  <div class="hero-title">Convierte tu investigación<br>en un <em>paisaje de conocimiento</em></div>
-  <div class="hero-desc">Carga uno o varios documentos. La IA los analizará y generará visualizaciones en 10 dimensiones de apropiación social del conocimiento.</div>
+  <div class="eyebrow">— Taller 1 —</div>
+  <div class="hero-title">Plataforma de análisis y visualización:<br><em>De la investigación a la Sociedad</em></div>
+  <div class="hero-desc">Carga o arrastra uno o varios documentos para iniciar el análisis. La plataforma procesará automáticamente la información y visualizará las diez dimensiones definidas para este taller, generando hallazgos, patrones y oportunidades que servirán como base para la construcción de una estrategia de comunicación orientada a la apropiación social del conocimiento.</div>
 </div>
 
 <div class="drop-zone" id="dropZone">
@@ -233,6 +233,7 @@ input[type=file]{display:none;}
 <div class="bottom-note">Tus documentos se procesan de forma segura · La API key nunca se almacena</div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
 const DIMS=[
   {id:'sinopsis',label:'Sinopsis'},
@@ -318,12 +319,48 @@ function showError(msg){document.getElementById('errorBox').innerHTML=`<div clas
 function clearError(){document.getElementById('errorBox').innerHTML='';}
 
 
+async function extractPDFText(base64Data,name){
+  const pdfjsLib=window['pdfjs-dist/build/pdf'];
+  if(!pdfjsLib)throw new Error('PDF.js no disponible');
+  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const binary=atob(base64Data);
+  const bytes=new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+  const pdf=await pdfjsLib.getDocument({data:bytes}).promise;
+  let text=`[Documento: ${name} — ${pdf.numPages} páginas]\n\n`;
+  for(let i=1;i<=pdf.numPages;i++){
+    const page=await pdf.getPage(i);
+    const content=await page.getTextContent();
+    text+=content.items.map(item=>item.str).join(' ')+'\n';
+  }
+  return text.slice(0,120000);
+}
+
 function readFile(file){
   return new Promise(resolve=>{
     const e=gExt(file.name);
     if(e==='pdf'){
       const r=new FileReader();
-      r.onload=ev=>resolve({type:'pdf',base64:ev.target.result.split(',')[1],name:file.name});
+      r.onload=async ev=>{
+        const base64=ev.target.result.split(',')[1];
+        // Check page count via PDF.js; use text extraction for >90 pages
+        try{
+          const pdfjsLib=window['pdfjs-dist/build/pdf'];
+          if(pdfjsLib){
+            pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            const binary=atob(base64);
+            const bytes=new Uint8Array(binary.length);
+            for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+            const pdf=await pdfjsLib.getDocument({data:bytes}).promise;
+            if(pdf.numPages>90){
+              addLog(`PDF grande detectado (${pdf.numPages} págs.) — extrayendo texto...`);
+              const text=await extractPDFText(base64,file.name);
+              return resolve(text);
+            }
+          }
+        }catch(ignored){}
+        resolve({type:'pdf',base64,name:file.name});
+      };
       r.readAsDataURL(file);
     }else{
       const r=new FileReader();
@@ -377,12 +414,12 @@ ESTRUCTURA OBLIGATORIA (completa con información REAL del documento):
   ],
 
   "territorios": {
-    "intro": "Párrafo breve explicando dónde puede tener mayor incidencia este conocimiento y por qué, más allá de donde se realizó la investigación",
+    "intro": "Párrafo breve analizando dónde puede incidir este conocimiento basándose en el contenido real y la problemática estudiada — no en su lugar de origen. A nivel nacional menciona regiones o territorios colombianos específicos (departamentos, subregiones, ciudades), nunca 'Colombia' en abstracto. A nivel internacional elige países o regiones que comparten el mismo tipo de problema o contexto, aunque la investigación no haya sido hecha allí.",
     "lugares": [
-      {"nombre": "Nombre del territorio o región", "alcance": "Nacional Colombia", "razon": "Por qué este conocimiento puede incidir aquí significativamente"},
-      {"nombre": "Otro territorio", "alcance": "Nacional Colombia", "razon": "Razón específica"},
-      {"nombre": "País o región internacional", "alcance": "Internacional", "razon": "Por qué esta investigación puede ayudar aquí"},
-      {"nombre": "Otro lugar internacional", "alcance": "Internacional", "razon": "Razón de la incidencia"}
+      {"nombre": "Departamento o región colombiana específica (ej: Chocó, Pacífico, Caribe, Amazonia, Bogotá, Eje Cafetero)", "alcance": "Nacional", "razon": "Qué característica concreta de este lugar lo hace especialmente receptivo — un problema local, una comunidad, una brecha específica que este conocimiento puede abordar"},
+      {"nombre": "Otra región colombiana específica — NUNCA poner 'Colombia' completo como respuesta, siempre un territorio concreto", "alcance": "Nacional", "razon": "Razón basada en el contenido de la investigación, no en generalidades geográficas"},
+      {"nombre": "País o región del mundo con contexto similar al problema estudiado — no necesariamente el país de origen de la investigación", "alcance": "Internacional", "razon": "Por qué este conocimiento viaja hasta aquí — qué comparte este lugar con el fenómeno investigado"},
+      {"nombre": "Otro país o región internacional relevante al tema y su problemática, no al origen del estudio", "alcance": "Internacional", "razon": "Razón sustentada en el contenido y la problemática, no en la nacionalidad del investigador"}
     ]
   },
 
